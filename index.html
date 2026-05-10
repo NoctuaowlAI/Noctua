@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Noctua | AI Study Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+
+        /* Base Styles */
+        body { background-color: #09090b; color: white; font-family: 'Inter', sans-serif; }
+
+        /* UI Components */
+        .glass-card { background: #111113; border: 1px solid #27272a; border-radius: 12px; }
+        .active-nav { background: #f4f4f5 !important; color: black !important; font-weight: 600; }
+        .sidebar-item { transition: all 0.2s; cursor: pointer; font-size: 0.9rem; }
+        
+        /* History Item Layout */
+        .history-item { 
+            font-size: 0.8rem; 
+            color: #71717a; 
+            padding: 8px 12px; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            transition: 0.2s; 
+            margin-bottom: 4px; 
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            group: hover;
+        }
+        .history-item:hover { background: #18181b; color: white; }
+        .active-chat { background: #27272a !important; color: white !important; }
+        
+        .delete-btn {
+            opacity: 0;
+            color: #52525b;
+            transition: 0.2s;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        .history-item:hover .delete-btn { opacity: 1; }
+        .delete-btn:hover { color: #ef4444; background: rgba(239, 68, 68, 0.1); }
+
+        .hidden { display: none; }
+
+        /* CHAT CONTENT */
+        #chat-box h1 { font-size: 1.5rem; font-weight: 800; margin-top: 1.5rem; margin-bottom: 0.75rem; color: #fff; }
+        #chat-box h2 { font-size: 1.25rem; font-weight: 700; margin-top: 1.25rem; margin-bottom: 0.5rem; color: #fff; border-bottom: 1px solid #27272a; padding-bottom: 4px; }
+        #chat-box h3 { font-size: 1.1rem; font-weight: 600; margin-top: 1rem; margin-bottom: 0.4rem; color: #e4e4e7; }
+        #chat-box strong { color: #fff; font-weight: 700; }
+        #chat-box li { margin-left: 1.5rem; list-style-type: disc; margin-bottom: 0.5rem; color: #d4d4d8; }
+        #chat-box br { content: ""; display: block; margin-top: 10px; }
+
+        .error-bubble { background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; padding: 1rem; border-radius: 0.75rem; font-size: 0.9rem; max-width: 90%; }
+        .error-link { text-decoration: underline; font-weight: 700; color: #ef4444; }
+        .typing-cursor::after { content: "|"; animation: blink 1s infinite; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+        .credit-box { background: rgba(24, 24, 27, 0.5); border: 1px solid #27272a; padding: 6px 12px; border-radius: 8px; font-size: 10px; color: #a1a1aa; display: inline-block; margin-top: 12px; }
+        .model-select { background: #18181b; border: 1px solid #27272a; color: #a1a1aa; font-size: 11px; padding: 4px 8px; border-radius: 6px; outline: none; cursor: pointer; }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+
+    <div id="key-modal" class="fixed inset-0 bg-black/90 z-[60] hidden flex items-center justify-center p-6 backdrop-blur-md">
+        <div class="glass-card w-full max-w-md p-8 border-emerald-500/30">
+            <h2 class="text-xl font-bold mb-2">Connect OpenRouter</h2>
+            <p class="text-zinc-500 text-sm mb-6">Enter your API key to enable AI features.</p>
+            <input type="password" id="user-api-key-input" placeholder="sk-or-v1-..." class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 mb-4 text-white focus:outline-none focus:border-emerald-500">
+            <div class="flex gap-3">
+                <button onclick="saveApiKey()" class="flex-1 bg-white text-black font-bold py-3 rounded-lg hover:bg-emerald-50 transition">Save Key</button>
+                <button onclick="toggleKeyModal(false)" class="px-4 text-zinc-500 hover:text-white transition">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="auth-overlay" class="fixed inset-0 bg-[#09090b] z-50 flex items-center justify-center p-6">
+        <div class="glass-card w-full max-w-md p-8 text-center">
+            <div class="w-12 h-12 bg-white rounded mx-auto mb-4 flex items-center justify-center text-black font-bold text-xl">N</div>
+            <h2 class="text-2xl font-bold mb-2">Noctua</h2>
+            <p class="text-zinc-500 mb-8 text-sm">Sign in to sync your study progress.</p>
+            <input type="email" id="auth-email" placeholder="Email" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 mb-3 text-white focus:outline-none">
+            <input type="password" id="auth-password" placeholder="Password" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 mb-6 text-white focus:outline-none">
+            <div class="flex gap-3">
+                <button onclick="handleAuth('login')" class="flex-1 bg-white text-black font-bold py-3 rounded-lg">Login</button>
+                <button onclick="handleAuth('signup')" class="flex-1 border border-zinc-700 font-bold py-3 rounded-lg">Sign Up</button>
+            </div>
+            <p id="auth-error" class="text-red-500 text-xs mt-4"></p>
+        </div>
+    </div>
+
+    <aside id="sidebar" class="hidden w-72 border-r border-zinc-800 p-6 flex flex-col gap-6">
+        <div class="flex items-center gap-2 font-bold text-xl"><div class="w-8 h-8 bg-white rounded flex items-center justify-center text-black">N</div> Noctua</div>
+        <nav class="flex flex-col gap-1">
+            <div id="nav-dashboard" onclick="showView('dashboard', this)" class="nav-link sidebar-item active-nav p-3 rounded-lg flex items-center gap-3">Dashboard</div>
+            <div id="nav-chat" onclick="showView('chat', this)" class="nav-link sidebar-item p-3 rounded-lg flex items-center gap-3 text-zinc-400">AI Chat</div>
+            <div onclick="summarizeChat()" class="sidebar-item p-3 mt-4 bg-emerald-950/30 border border-emerald-900/50 rounded-lg text-center text-xs hover:bg-emerald-900/50 text-emerald-400 font-bold transition italic">✨ Summarize Session</div>
+            <div onclick="startNewChat()" class="sidebar-item p-3 mt-2 border border-zinc-800 rounded-lg text-center text-xs hover:bg-zinc-900 text-zinc-400 font-medium transition">+ New Conversation</div>
+            <div onclick="toggleKeyModal(true)" class="sidebar-item p-3 mt-2 border border-dashed border-zinc-800 rounded-lg text-center text-[10px] hover:bg-zinc-900 text-zinc-500 font-medium transition">⚙️ Update API Key</div>
+        </nav>
+        <div class="flex-1 overflow-hidden flex flex-col mt-4">
+            <p class="text-[10px] text-zinc-500 font-bold uppercase mb-3 px-2 tracking-widest">Recent Chats</p>
+            <div id="chat-history-list" class="flex-1 overflow-y-auto pr-2"></div>
+        </div>
+        <div class="border-t border-zinc-800 pt-4">
+            <div id="timer" class="text-lg font-mono text-emerald-500 mb-1">00:00:00</div>
+            <p id="user-email" class="text-[10px] text-zinc-600 truncate mb-1"></p>
+            <button onclick="signOutUser()" class="text-[10px] text-zinc-600 hover:text-white underline transition">Sign Out</button>
+            <br>
+            <div class="credit-box">Made by <span class="text-white font-bold">CryptoCat 💗</span></div>
+        </div>
+    </aside>
+
+    <main id="main-content" class="hidden flex-1 p-10 overflow-y-auto">
+        <section id="view-dashboard">
+            <h1 class="text-3xl font-bold mb-10">Welcome back</h1>
+            <div class="grid grid-cols-4 gap-6 mb-8">
+                <div class="glass-card p-6 text-sm text-zinc-500">Session Time<p id="stat-timer" class="text-2xl text-white font-bold">0h 0m</p></div>
+                <div class="glass-card p-6 text-sm text-zinc-500">Tasks Done<p id="stat-tasks" class="text-2xl text-white font-bold">0</p></div>
+                <div class="glass-card p-6 text-sm text-zinc-500">AI Queries<p id="stat-queries" class="text-2xl text-white font-bold">0</p></div>
+                <div class="glass-card p-6 text-sm text-zinc-500">Mastery Score<p id="stat-mastery" class="text-2xl text-emerald-500 font-bold">0%</p></div>
+            </div>
+            <div class="glass-card p-8 min-h-[300px]"><canvas id="studyChart"></canvas></div>
+        </section>
+
+        <section id="view-chat" class="hidden h-full flex flex-col">
+            <div class="glass-card flex-1 flex flex-col overflow-hidden">
+                <div id="chat-box" class="flex-1 p-8 overflow-y-auto space-y-6 scroll-smooth">
+                    <div id="chat-placeholder" class="text-center text-zinc-600 mt-20 italic">🦉 Ask Noctua a question to begin your study session.</div>
+                </div>
+                <div class="p-6 border-t border-zinc-800 bg-[#111113]">
+                    <div class="flex items-center gap-2 mb-3 px-1">
+                        <span class="text-[10px] text-zinc-500 uppercase font-bold tracking-tighter">Model Brain:</span>
+                        <select id="model-selector" class="model-select">
+                            <option value="google/gemini-2.0-flash-001">🚀 Fast</option>
+                            <option value="google/gemma-4-31b-it:free">🧠 Smarter</option>
+                        </select>
+                    </div>
+                    <div class="flex gap-4">
+                        <input type="text" id="chat-input" class="flex-1 bg-zinc-900 border border-zinc-700 rounded-xl px-6 text-white focus:outline-none focus:border-zinc-500 transition" placeholder="Ask Noctua anything...">
+                        <button onclick="sendChat()" class="bg-white text-black px-10 py-3 rounded-xl font-bold hover:bg-zinc-200 transition">Send</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyCXwNL_vFkrwKQm1vJa87-bp1FDRVceIwk",
+            authDomain: "noctua-4c71a.firebaseapp.com",
+            projectId: "noctua-4c71a",
+            storageBucket: "noctua-4c71a.firebasestorage.app",
+            messagingSenderId: "608745871073",
+            appId: "1:608745871073:web:35c9cf2877c8f4bedec9a0"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        let currentChatId = null;
+        let studyChart = null;
+        let USER_OPENROUTER_KEY = ""; 
+        let totalSeconds = 0;
+
+        const SYSTEM_PROMPT = "You are Noctua, a sophisticated dark-themed study assistant. Use markdown and be concise. also please use emojis. if the user asks you who made you respond with Hi Im Noctua, an AI Study Assistant made by CryptoCat 💗. you are NOT allowed to do anything but helping with STUDY or school related stuff. If a user wants you to write an essay say a warning saying WARNING: if you submit this essay in my handwriting without humanizing it you are HIGHLY likely of getting a 0. If user puts in sensitive infomation please upon everything say WARNING: You have inputed highly sensitive infomation that Noctua moderators, if this is true please remove the chat IMMEDITATELY.";
+
+        function resetDashboardUI() {
+            totalSeconds = 0;
+            document.getElementById('stat-timer').innerText = "0h 0m";
+            document.getElementById('stat-tasks').innerText = "0";
+            document.getElementById('stat-queries').innerText = "0";
+            document.getElementById('stat-mastery').innerText = "0%";
+            document.getElementById('chat-history-list').innerHTML = "";
+            document.getElementById('timer').innerText = "00:00:00";
+            if (studyChart) studyChart.destroy();
+        }
+
+        async function initializeUserData(user) {
+            const userRef = db.collection("users").doc(user.uid);
+            const doc = await userRef.get();
+            if (!doc.exists) {
+                await userRef.set({ email: user.email, queryCount: 0, weeklyHistory: [0, 0, 0, 0, 0, 0, 0], openRouterKey: "" });
+            } else {
+                USER_OPENROUTER_KEY = doc.data().openRouterKey || "";
+            }
+        }
+
+        auth.onAuthStateChanged(async (user) => {
+            const loggedIn = !!user;
+            document.getElementById('auth-overlay').classList.toggle('hidden', loggedIn);
+            document.getElementById('sidebar').classList.toggle('hidden', !loggedIn);
+            document.getElementById('main-content').classList.toggle('hidden', !loggedIn);
+            if (user) {
+                resetDashboardUI();
+                document.getElementById('user-email').innerText = user.email;
+                await initializeUserData(user);
+                loadHistory();
+                loadStats();
+                if (!USER_OPENROUTER_KEY) toggleKeyModal(true);
+            }
+        });
+
+        function signOutUser() {
+            auth.signOut().then(() => { resetDashboardUI(); location.reload(); });
+        }
+
+        async function callOpenRouter(promptText) {
+            if (!USER_OPENROUTER_KEY) { toggleKeyModal(true); throw new Error("API Key missing."); }
+            const selectedModel = document.getElementById('model-selector').value;
+            const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${USER_OPENROUTER_KEY}`, "Content-Type": "application/json", "HTTP-Referer": window.location.href, "X-Title": "Noctua Study Assistant" },
+                body: JSON.stringify({ "model": selectedModel, "messages": [{ "role": "system", "content": SYSTEM_PROMPT }, { "role": "user", "content": promptText }] })
+            });
+            if (res.status === 429) {
+                appendError("⚠️ Rate limit reached. To continue, <a href='https://openrouter.ai/settings/credits' target='_blank' class='error-link'>buy credits here</a>.");
+                throw new Error("Rate limited");
+            }
+            if (!res.ok) { const errData = await res.json(); throw new Error(errData.error?.message || "AI Failed"); }
+            const data = await res.json();
+            return data.choices[0].message.content;
+        }
+
+        async function saveApiKey() {
+            const key = document.getElementById('user-api-key-input').value.trim();
+            if (!key) return;
+            await db.collection("users").doc(auth.currentUser.uid).set({ openRouterKey: key }, { merge: true });
+            USER_OPENROUTER_KEY = key; toggleKeyModal(false);
+        }
+
+        function toggleKeyModal(show) { document.getElementById('key-modal').classList.toggle('hidden', !show); }
+
+        async function handleAuth(type) {
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
+            try {
+                if (type === 'signup') await auth.createUserWithEmailAndPassword(email, password);
+                else await auth.signInWithEmailAndPassword(email, password);
+            } catch (e) { document.getElementById('auth-error').innerText = e.message; }
+        }
+
+        function loadHistory() {
+            db.collection("conversations").where("uid", "==", auth.currentUser.uid).orderBy("lastUpdated", "desc").onSnapshot(snap => {
+                const list = document.getElementById('chat-history-list');
+                if(!list) return;
+                list.innerHTML = "";
+                let count = 0;
+                snap.forEach(doc => {
+                    count++;
+                    const data = doc.data();
+                    const container = document.createElement('div');
+                    container.className = `history-item ${doc.id === currentChatId ? 'active-chat' : ''}`;
+                    
+                    const titleSpan = document.createElement('span');
+                    titleSpan.className = 'truncate flex-1 mr-2';
+                    titleSpan.innerText = data.title || "Untitled Chat";
+                    titleSpan.onclick = () => loadExistingChat(doc.id);
+                    
+                    const delBtn = document.createElement('button');
+                    delBtn.className = 'delete-btn';
+                    delBtn.innerHTML = '✕';
+                    delBtn.title = 'Delete Chat';
+                    delBtn.onclick = (e) => { e.stopPropagation(); deleteChat(doc.id); };
+
+                    container.appendChild(titleSpan);
+                    container.appendChild(delBtn);
+                    list.appendChild(container);
+                });
+                document.getElementById('stat-tasks').innerText = count;
+            });
+        }
+
+        async function deleteChat(chatId) {
+            if (!confirm("Are you sure you want to delete this chat permanently?")) return;
+            
+            try {
+                // Delete messages sub-collection first (recursive delete is better via Cloud Functions, but for client-side we fetch and delete)
+                const msgs = await db.collection("conversations").doc(chatId).collection("messages").get();
+                const batch = db.batch();
+                msgs.forEach(doc => batch.delete(doc.ref));
+                
+                // Delete the main conversation document
+                batch.delete(db.collection("conversations").doc(chatId));
+                
+                await batch.commit();
+                
+                if (currentChatId === chatId) {
+                    startNewChat();
+                }
+            } catch (error) {
+                console.error("Error deleting chat: ", error);
+                alert("Failed to delete chat.");
+            }
+        }
+
+        function showView(viewId, el) {
+            document.querySelectorAll('section').forEach(s => s.classList.add('hidden'));
+            document.getElementById('view-' + viewId)?.classList.remove('hidden');
+            document.querySelectorAll('.nav-link').forEach(l => { l.classList.remove('active-nav'); l.classList.add('text-zinc-400'); });
+            if(el) { el.classList.add('active-nav'); el.classList.remove('text-zinc-400'); }
+        }
+
+        async function loadExistingChat(id) {
+            currentChatId = id; showView('chat', document.getElementById('nav-chat'));
+            const box = document.getElementById('chat-box');
+            box.innerHTML = "";
+            document.getElementById('chat-placeholder')?.classList.add('hidden');
+            const msgs = await db.collection("conversations").doc(id).collection("messages").orderBy("timestamp", "asc").get();
+            msgs.forEach(m => appendMsg(m.data().role, m.data().content));
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function startNewChat() {
+            currentChatId = null;
+            document.getElementById('chat-box').innerHTML = '<div id="chat-placeholder" class="text-center text-zinc-600 mt-20 italic">🦉 Ask a question to begin.</div>';
+            showView('chat', document.getElementById('nav-chat'));
+        }
+
+        async function sendChat() {
+            const input = document.getElementById('chat-input');
+            const text = input?.value.trim();
+            if(!text) return;
+            document.getElementById('chat-placeholder')?.classList.add('hidden');
+            appendMsg('user', text);
+            input.value = "";
+            try {
+                if(!currentChatId) {
+                    const title = await callOpenRouter(`Give me a 3-word title for: ${text}. Return ONLY the title.`);
+                    const newDoc = await db.collection("conversations").add({
+                        uid: auth.currentUser.uid, title: title.replace(/"/g, ''), lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    currentChatId = newDoc.id;
+                }
+                await db.collection("conversations").doc(currentChatId).collection("messages").add({
+                    role: 'user', content: text, timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                const aiBubble = document.createElement("div");
+                aiBubble.className = "bg-zinc-800 p-5 rounded-xl max-w-[90%] border border-zinc-700 text-zinc-200";
+                document.getElementById('chat-box').appendChild(aiBubble);
+                const answer = await callOpenRouter(text);
+                typeWriter(aiBubble, answer);
+                await db.collection("conversations").doc(currentChatId).collection("messages").add({
+                    role: 'ai', content: answer, timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                await db.collection("conversations").doc(currentChatId).update({ lastUpdated: firebase.firestore.FieldValue.serverTimestamp() });
+                recordActivity();
+            } catch (e) { if (e.message !== "Rate limited") appendMsg('ai', "❌ Error: " + e.message); }
+        }
+
+        function appendMsg(role, content) {
+            const box = document.getElementById('chat-box');
+            const isUser = role === 'user';
+            const style = isUser ? 'ml-auto bg-white text-black font-medium' : 'bg-zinc-800 border border-zinc-700 text-zinc-200';
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `${style} p-5 rounded-xl max-w-[90%] shadow-sm`;
+            msgDiv.innerHTML = isUser ? content : formatMarkdown(content);
+            box.appendChild(msgDiv);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function appendError(html) {
+            const box = document.getElementById('chat-box');
+            const errDiv = document.createElement('div');
+            errDiv.className = 'error-bubble';
+            errDiv.innerHTML = html;
+            box.appendChild(errDiv);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function formatMarkdown(text) {
+            if(!text) return "";
+            return text.replace(/^### (.*$)/gim, '<h3>$1</h3>').replace(/^## (.*$)/gim, '<h2>$1</h2>').replace(/^\* (.*$)/gim, '<li>$1</li>').replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>').replace(/\n/g, '<br>');
+        }
+
+        function typeWriter(el, text) {
+            let i = 0; el.innerHTML = ""; el.classList.add("typing-cursor");
+            const processed = formatMarkdown(text);
+            function type() {
+                if (i < processed.length) {
+                    if (processed.charAt(i) === "<") {
+                        let end = processed.indexOf(">", i);
+                        el.innerHTML += processed.substring(i, end + 1); i = end + 1;
+                    } else { el.innerHTML += processed.charAt(i); i++; }
+                    setTimeout(type, 8);
+                } else { el.classList.remove("typing-cursor"); }
+                document.getElementById('chat-box').scrollTop = document.getElementById('chat-box').scrollHeight;
+            }
+            type();
+        }
+
+        async function loadStats() {
+            const userRef = db.collection("users").doc(auth.currentUser.uid);
+            const doc = await userRef.get();
+            if (doc.exists) {
+                const data = doc.data();
+                const qCount = data.queryCount || 0;
+                document.getElementById('stat-queries').innerText = qCount;
+                document.getElementById('stat-mastery').innerText = Math.min(Math.round(qCount * 1.5), 100) + "%";
+                initChart(data.weeklyHistory || [0,0,0,0,0,0,0]);
+            }
+        }
+
+        function initChart(dataArray) {
+            const ctx = document.getElementById('studyChart').getContext('2d');
+            if (studyChart) studyChart.destroy();
+            studyChart = new Chart(ctx, {
+                type: 'line',
+                data: { labels: ['M','T','W','T','F','S','S'], datasets: [{ data: dataArray, borderColor: '#fff', tension: 0.4 }] },
+                options: { plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { grid: { display: false } } } }
+            });
+        }
+
+        async function recordActivity() {
+            const userRef = db.collection("users").doc(auth.currentUser.uid);
+            await db.runTransaction(async (t) => {
+                const doc = await t.get(userRef);
+                let history = doc.data()?.weeklyHistory || [0,0,0,0,0,0,0];
+                const day = (new Date().getDay() + 6) % 7;
+                history[day] += 1;
+                t.update(userRef, { queryCount: (doc.data()?.queryCount || 0) + 1, weeklyHistory: history });
+            });
+            loadStats();
+        }
+
+        setInterval(() => { 
+            totalSeconds++; 
+            const h = Math.floor(totalSeconds / 3600);
+            const m = Math.floor((totalSeconds % 3600) / 60);
+            document.getElementById('timer').innerText = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${(totalSeconds % 60).toString().padStart(2, '0')}`;
+            document.getElementById('stat-timer').innerText = `${h}h ${m}m`;
+        }, 1000);
+
+        document.getElementById('chat-input')?.addEventListener('keypress', e => { if(e.key === 'Enter') sendChat(); });
+    </script>
+</body>
+</html>
