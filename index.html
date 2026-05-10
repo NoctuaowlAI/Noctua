@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Noctua | AI Study Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        body { background-color: #09090b; color: white; font-family: 'Inter', sans-serif; }
+        .glass-card { background: #111113; border: 1px solid #27272a; border-radius: 12px; }
+        .active-nav { background: #f4f4f5 !important; color: black !important; font-weight: 600; }
+        .sidebar-item { transition: all 0.2s; cursor: pointer; font-size: 0.9rem; }
+        .history-item { font-size: 0.8rem; color: #71717a; padding: 8px 12px; border-radius: 8px; cursor: pointer; transition: 0.2s; margin-bottom: 4px; }
+        .history-item:hover { background: #18181b; color: white; }
+        .active-chat { background: #27272a !important; color: white !important; }
+        .hidden { display: none; }
+        .typing-cursor::after { content: "|"; animation: blink 1s infinite; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+
+    <div id="auth-overlay" class="fixed inset-0 bg-[#09090b] z-50 flex items-center justify-center p-6">
+        <div class="glass-card w-full max-w-md p-8 text-center">
+            <div class="w-12 h-12 bg-white rounded mx-auto mb-4 flex items-center justify-center text-black font-bold text-xl">N</div>
+            <h2 class="text-2xl font-bold mb-2">Noctua</h2>
+            <p class="text-zinc-500 mb-8 text-sm">Sign in to sync your study progress.</p>
+            <input type="email" id="auth-email" placeholder="Email" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 mb-3 text-white focus:outline-none">
+            <input type="password" id="auth-password" placeholder="Password" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 mb-6 text-white focus:outline-none">
+            <div class="flex gap-3">
+                <button onclick="handleAuth('login')" class="flex-1 bg-white text-black font-bold py-3 rounded-lg">Login</button>
+                <button onclick="handleAuth('signup')" class="flex-1 border border-zinc-700 font-bold py-3 rounded-lg">Sign Up</button>
+            </div>
+            <p id="auth-error" class="text-red-500 text-xs mt-4"></p>
+        </div>
+    </div>
+
+    <aside id="sidebar" class="hidden w-72 border-r border-zinc-800 p-6 flex flex-col gap-6">
+        <div class="flex items-center gap-2 font-bold text-xl"><div class="w-8 h-8 bg-white rounded flex items-center justify-center text-black">N</div> Noctua</div>
+        <nav class="flex flex-col gap-1">
+            <div id="nav-dashboard" onclick="showView('dashboard', this)" class="nav-link sidebar-item active-nav p-3 rounded-lg flex items-center gap-3">Dashboard</div>
+            <div id="nav-chat" onclick="showView('chat', this)" class="nav-link sidebar-item p-3 rounded-lg flex items-center gap-3 text-zinc-400">AI Chat</div>
+            <div onclick="summarizeChat()" class="sidebar-item p-3 mt-4 bg-emerald-950/30 border border-emerald-900/50 rounded-lg text-center text-xs hover:bg-emerald-900/50 text-emerald-400 font-bold italic">✨ Summarize Session</div>
+            <div onclick="startNewChat()" class="sidebar-item p-3 mt-2 border border-zinc-800 rounded-lg text-center text-xs hover:bg-zinc-900 text-zinc-400 font-medium">+ New Conversation</div>
+        </nav>
+        <div class="flex-1 overflow-hidden flex flex-col mt-4">
+            <p class="text-[10px] text-zinc-500 font-bold uppercase mb-3 px-2 tracking-widest">Recent Chats</p>
+            <div id="chat-history-list" class="flex-1 overflow-y-auto pr-2"></div>
+        </div>
+        <div class="border-t border-zinc-800 pt-4">
+            <div id="timer" class="text-lg font-mono text-emerald-500 mb-1">00:00</div>
+            <p id="user-email" class="text-[10px] text-zinc-600 truncate mb-2"></p>
+            <button onclick="auth.signOut()" class="text-xs text-zinc-400 hover:text-white underline">Sign Out</button>
+        </div>
+    </aside>
+
+    <main id="main-content" class="hidden flex-1 p-10 overflow-y-auto">
+        <section id="view-dashboard">
+            <h1 class="text-3xl font-bold mb-10">Welcome back</h1>
+            <div class="grid grid-cols-4 gap-6 mb-8">
+                <div class="glass-card p-6 text-sm text-zinc-500">Session Time<p id="stat-timer" class="text-2xl text-white font-bold">0m</p></div>
+                <div class="glass-card p-6 text-sm text-zinc-500">Tasks Done<p class="text-2xl text-white font-bold">0</p></div>
+                <div class="glass-card p-6 text-sm text-zinc-500">AI Queries<p id="stat-queries" class="text-2xl text-white font-bold">0</p></div>
+                <div class="glass-card p-6 text-sm text-zinc-500">Mastery Score<p class="text-2xl text-emerald-500 font-bold">0%</p></div>
+            </div>
+            <div class="glass-card p-8 min-h-[300px]"><canvas id="studyChart"></canvas></div>
+        </section>
+
+        <section id="view-chat" class="hidden h-full flex flex-col">
+            <div class="glass-card flex-1 flex flex-col overflow-hidden">
+                <div id="chat-box" class="flex-1 p-8 overflow-y-auto space-y-6 scroll-smooth">
+                    <div id="chat-placeholder" class="text-center text-zinc-600 mt-20 italic">🦉 Ask Noctua a question to begin.</div>
+                </div>
+                <div class="p-6 border-t border-zinc-800 bg-[#111113]">
+                    <div class="flex gap-4">
+                        <input type="text" id="chat-input" class="flex-1 bg-zinc-900 border border-zinc-700 rounded-xl px-6 text-white focus:outline-none" placeholder="Ask Noctua anything...">
+                        <button onclick="sendChat()" class="bg-white text-black px-10 py-3 rounded-xl font-bold hover:bg-zinc-200">Send</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // Replace with your actual Firebase config
+        const firebaseConfig = {
+            apiKey: "AIzaSyCXwNL_vFkrwKQm1vJa87-bp1FDRVceIwk",
+            authDomain: "noctua-4c71a.firebaseapp.com",
+            projectId: "noctua-4c71a",
+            storageBucket: "noctua-4c71a.firebasestorage.app",
+            messagingSenderId: "608745871073",
+            appId: "1:608745871073:web:35c9cf2877c8f4bedec9a0"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        let currentChatId = null;
+        let studyChart = null;
+
+        // FIXED: Calls the Netlify function endpoint correctly
+        async function callAI(prompt) {
+            const res = await fetch("./netlify/functions/ask", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ prompt: prompt })
+            });
+            
+            if (!res.ok) throw new Error("AI request failed. Check Netlify function.");
+            const data = await res.json();
+            return data.content;
+        }
+
+        async function handleAuth(type) {
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
+            try {
+                if (type === 'signup') await auth.createUserWithEmailAndPassword(email, password);
+                else await auth.signInWithEmailAndPassword(email, password);
+            } catch (e) { document.getElementById('auth-error').innerText = e.message; }
+        }
+
+        auth.onAuthStateChanged(user => {
+            document.getElementById('auth-overlay')?.classList.toggle('hidden', !!user);
+            document.getElementById('sidebar')?.classList.toggle('hidden', !user);
+            document.getElementById('main-content')?.classList.toggle('hidden', !user);
+            if(user) {
+                document.getElementById('user-email').innerText = user.email;
+                loadHistory();
+                loadStats();
+            }
+        });
+
+        function loadHistory() {
+            db.collection("conversations")
+              .where("uid", "==", auth.currentUser.uid)
+              .orderBy("lastUpdated", "desc")
+              .onSnapshot(snap => {
+                  const list = document.getElementById('chat-history-list');
+                  if(!list) return;
+                  list.innerHTML = "";
+                  snap.forEach(doc => {
+                      const div = document.createElement('div');
+                      div.className = `history-item truncate ${doc.id === currentChatId ? 'active-chat' : ''}`;
+                      div.innerText = doc.data().title || "Untitled Chat";
+                      div.onclick = () => loadExistingChat(doc.id);
+                      list.appendChild(div);
+                  });
+              });
+        }
+
+        // FIXED: Added optional chaining to prevent TypeError: classList
+        function showView(viewId, el) {
+            document.querySelectorAll('section').forEach(s => s.classList.add('hidden'));
+            const target = document.getElementById('view-' + viewId);
+            if(target) target.classList.remove('hidden');
+            
+            document.querySelectorAll('.nav-link').forEach(l => {
+                l.classList.remove('active-nav'); 
+                l.classList.add('text-zinc-400');
+            });
+            
+            if(el?.classList) {
+                el.classList.add('active-nav');
+                el.classList.remove('text-zinc-400');
+            }
+        }
+
+        async function loadExistingChat(id) {
+            currentChatId = id;
+            showView('chat', document.getElementById('nav-chat'));
+            const box = document.getElementById('chat-box');
+            if(!box) return;
+            box.innerHTML = "";
+            document.getElementById('chat-placeholder')?.classList.add('hidden');
+            const msgs = await db.collection("conversations").doc(id)
+                .collection("messages").orderBy("timestamp", "asc").get();
+            msgs.forEach(m => appendMsg(m.data().role, m.data().content));
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function startNewChat() {
+            currentChatId = null;
+            const box = document.getElementById('chat-box');
+            if(box) box.innerHTML = '<div id="chat-placeholder" class="text-center text-zinc-600 mt-20 italic">🦉 Ask a question to begin.</div>';
+            showView('chat', document.getElementById('nav-chat'));
+        }
+
+        async function sendChat() {
+            const input = document.getElementById('chat-input');
+            const text = input?.value.trim();
+            if(!text) return;
+            document.getElementById('chat-placeholder')?.classList.add('hidden');
+            appendMsg('user', text);
+            input.value = "";
+            try {
+                if(!currentChatId) {
+                    const title = await callAI(`Generate a 2-word title for: ${text}`);
+                    const newDoc = await db.collection("conversations").add({
+                        uid: auth.currentUser.uid, 
+                        title: title.replace(/"/g, ''), 
+                        lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    currentChatId = newDoc.id;
+                }
+                await db.collection("conversations").doc(currentChatId).collection("messages").add({
+                    role: 'user', content: text, timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                const aiBubble = document.createElement("div");
+                aiBubble.className = "bg-zinc-800 p-5 rounded-xl max-w-[90%] border border-zinc-700 text-zinc-200";
+                document.getElementById('chat-box')?.appendChild(aiBubble);
+                const answer = await callAI(text);
+                typeWriter(aiBubble, answer);
+                await db.collection("conversations").doc(currentChatId).collection("messages").add({
+                    role: 'ai', content: answer, timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                await db.collection("conversations").doc(currentChatId).update({ lastUpdated: firebase.firestore.FieldValue.serverTimestamp() });
+                recordActivity();
+            } catch (e) { console.error(e); }
+        }
+
+        function appendMsg(role, content) {
+            const box = document.getElementById('chat-box');
+            if(!box) return;
+            const isUser = role === 'user';
+            const msgDiv = document.createElement('div');
+            msgDiv.className = isUser ? 'ml-auto bg-white text-black p-5 rounded-xl max-w-[90%]' : 'bg-zinc-800 p-5 rounded-xl border border-zinc-700 text-zinc-200 max-w-[90%]';
+            msgDiv.innerHTML = isUser ? content : formatMarkdown(content);
+            box.appendChild(msgDiv);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function formatMarkdown(t) {
+            return t.replace(/\*\*(.*)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>').replace(/^\* (.*)/gm, '<li>$1</li>');
+        }
+
+        function typeWriter(el, text) {
+            let i = 0; el.innerHTML = ""; el.classList.add("typing-cursor");
+            const processed = formatMarkdown(text);
+            function type() {
+                if (i < processed.length) {
+                    if (processed.charAt(i) === "<") {
+                        let end = processed.indexOf(">", i);
+                        el.innerHTML += processed.substring(i, end + 1); i = end + 1;
+                    } else { el.innerHTML += processed.charAt(i); i++; }
+                    setTimeout(type, 8);
+                } else el.classList.remove("typing-cursor");
+                const box = document.getElementById('chat-box');
+                if(box) box.scrollTop = box.scrollHeight;
+            }
+            type();
+        }
+
+        async function loadStats() {
+            const doc = await db.collection("users").doc(auth.currentUser.uid).get();
+            if(doc.exists) {
+                document.getElementById('stat-queries').innerText = doc.data().queryCount || 0;
+                initChart(doc.data().weeklyHistory || [0,0,0,0,0,0,0]);
+            }
+        }
+
+        function initChart(data) {
+            const ctx = document.getElementById('studyChart')?.getContext('2d');
+            if(!ctx) return;
+            if(studyChart) studyChart.destroy();
+            studyChart = new Chart(ctx, {
+                type: 'line', data: { labels: ['M','T','W','T','F','S','S'], datasets: [{ data: data, borderColor: '#fff' }] },
+                options: { plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { grid: { display: false } } } }
+            });
+        }
+
+        async function recordActivity() {
+            const ref = db.collection("users").doc(auth.currentUser.uid);
+            await db.runTransaction(async (t) => {
+                const doc = await t.get(ref);
+                let history = doc.exists ? (doc.data().weeklyHistory || [0,0,0,0,0,0,0]) : [0,0,0,0,0,0,0];
+                history[(new Date().getDay() + 6) % 7] += 1;
+                t.set(ref, { queryCount: (doc.exists ? (doc.data().queryCount || 0) : 0) + 1, weeklyHistory: history }, { merge: true });
+            });
+            loadStats();
+        }
+
+        let s = 0; setInterval(() => { s++; const t = document.getElementById('timer'); if(t) t.innerText = new Date(s * 1000).toISOString().substr(14, 5); }, 1000);
+        document.getElementById('chat-input')?.addEventListener('keypress', e => { if(e.key === 'Enter') sendChat(); });
+    </script>
+</body>
+</html>
