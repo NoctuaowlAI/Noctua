@@ -71,7 +71,7 @@
     <div id="key-modal" class="fixed inset-0 bg-black/90 z-[60] hidden flex items-center justify-center p-6 backdrop-blur-md">
         <div class="glass-card w-full max-w-md p-8 border-emerald-500/30">
             <h2 class="text-xl font-bold mb-2">Connect OpenRouter</h2>
-            <p class="text-zinc-500 text-sm mb-6">Enter your API key to enable AI features.</p>
+            <p class="text-zinc-500 text-sm mb-6">Enter your API key to enable AI features. To create an API key for free goto the following website, press signin, press new key, and give it a name, and get your key and paste it here: <a href="https://openrouter.ai/settings/keys" target="_blank" class="text-blue-600 underline">https://openrouter.ai/settings/keys</a></p>
             <input type="password" id="user-api-key-input" placeholder="sk-or-v1-..." class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 mb-4 text-white focus:outline-none focus:border-emerald-500">
             <div class="flex gap-3">
                 <button onclick="saveApiKey()" class="flex-1 bg-white text-black font-bold py-3 rounded-lg hover:bg-emerald-50 transition">Save Key</button>
@@ -220,7 +220,7 @@
                 body: JSON.stringify({ "model": selectedModel, "messages": [{ "role": "system", "content": SYSTEM_PROMPT }, { "role": "user", "content": promptText }] })
             });
             if (res.status === 429) {
-                appendError("⚠️ Rate limit reached. To continue, <a href='https://openrouter.ai/settings/credits' target='_blank' class='error-link'>buy credits here</a>.");
+                appendError("⚠️ You have reached the rate limit of 50 messages a day. To continue using this model, please <a href='https://openrouter.ai/settings/credits' target='_blank' class='error-link'>buy credits here</a>. Or if you don't want pay, switch the Model Brain to Fast.");
                 throw new Error("Rate limited");
             }
             if (!res.ok) { const errData = await res.json(); throw new Error(errData.error?.message || "AI Failed"); }
@@ -319,7 +319,7 @@
 
         function startNewChat() {
             currentChatId = null;
-            document.getElementById('chat-box').innerHTML = '<div id="chat-placeholder" class="text-center text-zinc-600 mt-20 italic">🦉 Ask a question to begin.</div>';
+            document.getElementById('chat-box').innerHTML = '<div id="chat-placeholder" class="text-center text-zinc-600 mt-20">🦉 Ask Noctua a question to begin.</div>';
             showView('chat', document.getElementById('nav-chat'));
         }
 
@@ -374,10 +374,23 @@
             box.scrollTop = box.scrollHeight;
         }
 
-        function formatMarkdown(text) {
-            if(!text) return "";
-            return text.replace(/^### (.*$)/gim, '<h3>$1</h3>').replace(/^## (.*$)/gim, '<h2>$1</h2>').replace(/^\* (.*$)/gim, '<li>$1</li>').replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>').replace(/\n/g, '<br>');
-        }
+function formatMarkdown(text) {
+    if (!text) return "";
+    return text
+        // Handle headers (h1, h2, h3)
+        .replace(/^### (.*$)/gim, '<h3>$1</h3>') 
+        .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+        .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+        // Handle bold text
+        .replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
+        // Fix for bullet points: matches '* ' at start of line, 
+        // ensures it doesn't capture extra newlines
+        .replace(/^\* +(.*)$/gim, '<li>$1</li>')
+        // Convert remaining newlines to breaks, 
+        // but avoid double-spacing after list items
+        .replace(/<\/li>\n/g, '</li>') 
+        .replace(/\n/g, '<br>');
+}
 
         function typeWriter(el, text) {
             let i = 0; el.innerHTML = ""; el.classList.add("typing-cursor");
