@@ -1,4 +1,4 @@
-    <!DOCTYPE html>
+       <!DOCTYPE html>
     <html lang="en">
     <head>
         <div style="position:fixed; top:0; right:0; color:red; font-weight:bold; padding:10px; z-index:9999; font-family:sans-serif;">ALPHA TEST BUILD. EXPECT BUGS</div>
@@ -158,7 +158,7 @@
                         <div class="flex items-center gap-2 mb-3 px-1">
                             <span class="text-[10px] text-zinc-500 uppercase font-bold tracking-tighter">Model Brain:</span>
                             <select id="model-selector" class="model-select" onchange="handleModelChange('brain')">
-                                <option value="google/gemini-2.0-flash-001" selected>🚀 Fast (pretty dumb i would say, this should only be used for simple tasks)</option>
+                                <option value="google/gemini-2.0-flash-001" selected>🚀 Fast</option>
                                 <option value="google/gemma-4-31b-it:free">🧠 Smarter</option>
                                 <option value="nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free">📚 research, study, and homework</option>
                                 <option value="openai/gpt-oss-120b:free">💻 Coding and Problem Solving with GPT4</option>
@@ -170,6 +170,7 @@
                     <option value="" selected disabled>Select Popular AI Models</option>
                     <option value="openai/gpt-oss-120b:free">ChatGPT</option>
                     <option value="poolside/laguna-m.1:free">Claude</option>
+                    <option value="google/gemma-4-26b-a4b-it:free">Gemini</option> 
                     </select>
                     </div>
                         </div>
@@ -188,7 +189,7 @@
             </button>
 
             <input type="text" id="chat-input" class="flex-1 bg-transparent py-4 px-2 text-white focus:outline-none" placeholder="Ask Noctua anything or upload a file...">
-        </div>
+            </div>
 
         <div class="flex gap-2">
     <button id="send-btn" onclick="sendChat()" class="bg-white text-black px-10 py-4 rounded-xl font-bold hover:bg-zinc-200 transition">
@@ -207,7 +208,7 @@
                 </div>
             </section>
         </main>
-
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
         <script>
                 // --- 1. FILE HANDLING LOGIC (Paste, Drag, Select) ---
 
@@ -375,19 +376,26 @@ function clearFile() {
 let isGenerating = false;
 
             const NOCTUA_MODELS = {
-                "google/gemini-2.0-flash-001": "You are the Noctua-Fast AI Model 🚀. You provide quick, concise, and direct answers. Use helpful emojis. if the user asks you who you are please say this: Hi, I'm Noctua, an AI Assistant made by CryptoCat 💗.",
-                "google/gemma-4-31b-it:free": "You are the Noctua-Smarter AI Model 🧠. You are a deep-thinking, highly intelligent assistant. Provide detailed explanations and use creative emojis. if the user asks you who you are please say this: Hi, I'm Noctua, an AI Assistant made by CryptoCat 💗.",
-                "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free": "You are the research, study, and homework Noctua AI Model 📖. You provide help with studying and homework, and researching if that is required by the user. Use helpful emojis.",
-                "openai/gpt-oss-120b:free": "You are the Coding and Problem solving Noctua AI Model 💻. You provide help with coding and problem solving. Use helpful emojis. if the user asks you who you are please say this: Hi, I'm Noctua, an AI Assistant made by CryptoCat 💗."
-            };
+    "google/gemini-2.0-flash-001":
+        "You are Noctua Fast. Give short, direct, useful answers. use helpful emojis",
+
+    "google/gemma-4-31b-it:free":
+        "You are Noctua Smart. Give detailed and thoughtful answers. use helpful emojis",
+
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free":
+        "You are Noctua Research. Help with research, studying, and explanations. use helpful emojis",
+
+    "openai/gpt-oss-120b:free":
+        "You are Noctua Code. Help with coding and problem solving. use helpful emojis"
+};
             const POPULAR_MODELS = {
-                "openai/gpt-oss-120b:free": "You are ChatGPT used from Noctua 🤖. You are capable of writing text, debugging code, brainstorming, and analyzing images or data. And answering questions",
-                "google/gemini-2.0-flash-001": "You are Gemini used from Noctua ✨. You are intellectually curious, highly sociable, witty, and adaptable, often acting as a communicative social butterfly",
+                "openai/gpt-oss-120b:free": "You are ChatGPT used from Noctua 🤖. You are capable of writing text,  ode, brainstorming, and analyzing images or data. And answering questions",
+                "google/gemma-4-26b-a4b-it:free": "You are Gemini used from Noctua ✨. You are intellectually curious, highly sociable, witty, and adaptable, often acting as a communicative social butterfly",
                 "poolside/laguna-m.1:free": "You are Claude used from Noctua ☁️. You are highly helpful, honest, and harmless AI assistant, often described as having a warm, collaborative, and, at times, exuberant personality."
             };
 
-            const BASE_CREDIT = "Hi, I'm Noctua, an AI Assistant made by CryptoCat 💗.";
-            const SAFETY_WARNING = "If the user inputs highly sensitive information (like passwords or private IDs), prepend your response with a 'WARNING: You have inputted highly sensitive information; please remove the chat IMMEDIATELY.'";
+            
+                
 
             auth.onAuthStateChanged(async (user) => {
                 const loggedIn = !!user;
@@ -453,20 +461,40 @@ if (!selectedModel || selectedModel === "none") {
     NOCTUA_MODELS[selectedModel] ||
     POPULAR_MODELS[selectedModel] ||
     "You are Noctua (An AI Assistant). Answer the user's questions to the best of your ability. Use helpful emojis in your responses.";
-    const finalSystemPrompt = `${modelSpecificInstruction} ${BASE_CREDIT} ${SAFETY_WARNING}`;
+    const finalSystemPrompt = modelSpecificInstruction;
+    const historySnapshot = await db
+    .collection("conversations")
+    .doc(currentChatId)
+    .collection("messages")
+    .orderBy("timestamp", "asc")
+    .limit(12)
+    .get();
+
+const historyMessages = [];
+
+historySnapshot.forEach(doc => {
+    const msg = doc.data();
+
+    historyMessages.push({
+        role: msg.role === "ai" ? "assistant" : "user",
+        content: msg.content
+    });
+});
 
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
+        signal: currentAbortController.signal,
         headers: { 
             "Authorization": `Bearer ${USER_OPENROUTER_KEY}`, 
             "Content-Type": "application/json"
         },
         body: JSON.stringify({ 
             "model": selectedModel, 
-            "messages": [
-                { "role": "system", "content": finalSystemPrompt },
-                { "role": "user", "content": messageContent }
-            ] 
+"messages": [
+    { "role": "system", "content": finalSystemPrompt },
+    ...historyMessages,
+    { "role": "user", "content": messageContent }
+]
         })
     });
 
@@ -778,7 +806,11 @@ function appendMsg(role, content, fileData = null) {
     }
 
     const textSpan = document.createElement('span');
-    textSpan.innerHTML = role === 'user' ? content : formatMarkdown(content);
+    textSpan.innerHTML = DOMPurify.sanitize(
+    role === 'user'
+        ? content
+        : formatMarkdown(content)
+);
     msgDiv.appendChild(textSpan);
 
     box.appendChild(msgDiv);
@@ -826,7 +858,9 @@ function formatMarkdown(text) {
             // Detect BEFORE updating content
             const shouldAutoScroll = isNearBottom();
 
-            element.innerHTML = formatMarkdown(text.substring(0, i + 1));
+            element.innerHTML = DOMPurify.sanitize(
+    formatMarkdown(text.substring(0, i + 1))
+);
             i++;
 
             // Only scroll if user is already near bottom
