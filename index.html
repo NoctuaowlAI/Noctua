@@ -1,4 +1,4 @@
-        <!DOCTYPE html>
+            <!DOCTYPE html>
     <html lang="en">
     <head>
         <link rel="icon" type="image/x-icon" href="favicon.png">
@@ -146,6 +146,7 @@
     
     <h1 class="text-3xl font-bold text-white mb-2 tracking-tight">Noctua</h1>
     <p class="text-zinc-400 text-lg font-medium">Ask anything to start</p>
+    <p class="text-zinc-400 text-lg font-low italics">disclaimer:</p>
     
     <div class="mt-8 flex gap-3 flex-wrap justify-center max-w-md">
         <button onclick="document.getElementById('chat-input').value='Explain quantum physics simply'; sendChat()" class="text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-4 py-2 rounded-full border border-zinc-700 transition">Explain quantum physics...</button>
@@ -190,7 +191,17 @@
             <input type="text" id="chat-input" class="flex-1 bg-transparent py-4 px-2 text-white focus:outline-none" placeholder="Ask Noctua anything or upload a file...">
         </div>
 
-        <button onclick="sendChat()" class="bg-white text-black px-10 py-4 rounded-xl font-bold hover:bg-zinc-200 transition">Send</button>
+        <div class="flex gap-2">
+    <button id="send-btn" onclick="sendChat()" class="bg-white text-black px-10 py-4 rounded-xl font-bold hover:bg-zinc-200 transition">
+        Send
+    </button>
+
+    <button id="stop-btn"
+        onclick="stopGeneration()"
+        class="hidden bg-red-500 text-white px-6 py-4 rounded-xl font-bold hover:bg-red-400 transition">
+        Stop
+    </button>
+</div>
     </div>
 </div>
                     </div>
@@ -199,6 +210,71 @@
         </main>
 
         <script>
+                // --- 1. FILE HANDLING LOGIC (Paste, Drag, Select) ---
+
+    // Handle Paste (Ctrl+V)
+    window.addEventListener('paste', e => {
+        const items = e.clipboardData.items;
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].kind === 'file') {
+                handleFileUpload(items[i].getAsFile());
+            }
+        }
+    });
+
+    // Handle Drag and Drop
+    const dropZone = document.body;
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(name => {
+        dropZone.addEventListener(name, e => {
+            e.preventDefault();
+            e.stopPropagation();
+        }, false);
+    });
+
+    dropZone.addEventListener('drop', e => {
+        const files = e.dataTransfer.files;
+        if (files.length > 0) handleFileUpload(files[0]);
+    });
+
+    // Main file processor
+    function handleFileUpload(file) {
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const isImage = file.type.startsWith('image/');
+            
+            attachedFileData = {
+                base64: isImage ? e.target.result.split(',')[1] : null,
+                content: isImage ? null : e.target.result,
+                type: file.type,
+                name: file.name,
+                isImage: isImage
+            };
+
+            const preview = document.getElementById('file-preview');
+            preview.classList.remove('hidden');
+            preview.innerHTML = `<span class="text-xs text-zinc-300">📎 ${file.name}</span> 
+            <button onclick="clearFile()" class="text-red-500 ml-2 hover:text-red-400">✕</button>`;
+        };
+
+        if (file.type.startsWith('image/')) {
+            reader.readAsDataURL(file);
+        } else {
+            reader.readAsText(file);
+        }
+    }
+
+    // Triggered by the hidden <input type="file">
+    function handleFileSelect(input) {
+        handleFileUpload(input.files[0]);
+    }
+
+    function clearFile() {
+        attachedFileData = null;
+        document.getElementById('file-input').value = "";
+        document.getElementById('file-preview').classList.add('hidden');
+    }
 const RANDOM_PROMPTS = [
     "Explain quantum physics simply", "Write a Python timer script",
     "How do I bake a chocolate cake?", "Give me 5 workout ideas",
@@ -218,20 +294,37 @@ function handleFileSelect(input) {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = function(e) {
-        attachedFileData = {
-            base64: e.target.result.split(',')[1],
-            type: file.type,
-            name: file.name
-        };
-        
+    reader.onload = async function(e) {
+        // If it's an image, store as Base64
+        if (file.type.startsWith('image/')) {
+            attachedFileData = {
+                base64: e.target.result.split(',')[1],
+                type: file.type,
+                name: file.name,
+                isImage: true
+            };
+        } else {
+            // If it's text/pdf/code, we read the content
+            const textContent = e.target.result;
+            attachedFileData = {
+                content: textContent,
+                type: file.type,
+                name: file.name,
+                isImage: false
+            };
+        }
         
         const preview = document.getElementById('file-preview');
         preview.classList.remove('hidden');
         preview.innerHTML = `<span class="text-xs text-zinc-300">📎 ${file.name}</span> 
         <button onclick="clearFile()" class="text-red-500 ml-2 hover:text-red-400">✕</button>`;
     };
-    reader.readAsDataURL(file);
+
+    if (file.type.startsWith('image/')) {
+        reader.readAsDataURL(file);
+    } else {
+        reader.readAsText(file); // Reads txt, js, py, css, etc.
+    }
 }
 
 function clearFile() {
@@ -279,8 +372,21 @@ function clearFile() {
             const db = firebase.firestore();
             let currentChatId = null;
             let USER_OPENROUTER_KEY = ""; 
+            let currentAbortController = null;
+let isGenerating = false;
 
-            
+            const NOCTUA_MODELS = {
+                "google/gemini-2.0-flash-001": "You are the Noctua-Fast AI Model 🚀. You provide quick, concise, and direct answers. Use helpful emojis. if the user asks you who you are please say this: Hi, I'm Noctua, an AI Assistant made by CryptoCat 💗.",
+                "google/gemma-4-31b-it:free": "You are the Noctua-Smarter AI Model 🧠. You are a deep-thinking, highly intelligent assistant. Provide detailed explanations and use creative emojis. if the user asks you who you are please say this: Hi, I'm Noctua, an AI Assistant made by CryptoCat 💗.",
+                "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free": "You are the research, study, and homework Noctua AI Model 📖. You provide help with studying and homework, and researching if that is required by the user. Use helpful emojis.",
+                "openai/gpt-oss-120b:free": "You are the Coding and Problem solving Noctua AI Model 💻. You provide help with coding and problem solving. Use helpful emojis. if the user asks you who you are please say this: Hi, I'm Noctua, an AI Assistant made by CryptoCat 💗."
+            };
+            const POPULAR_MODELS = {
+                "openai/gpt-oss-120b:free": "You are ChatGPT used from Noctua 🤖. You are capable of writing text, debugging code, brainstorming, and analyzing images or data. And answering questions",
+                "google/gemini-2.0-flash-001": "You are Gemini used from Noctua ✨. You are intellectually curious, highly sociable, witty, and adaptable, often acting as a communicative social butterfly",
+                "poolside/laguna-m.1:free": "You are Claude used from Noctua ☁️. You are highly helpful, honest, and harmless AI assistant, often described as having a warm, collaborative, and, at times, exuberant personality."
+            };
+
             const MODEL_PROMPTS = { 
                 "google/gemini-2.0-flash-001": "You are the Noctua-Fast AI Model 🚀. You provide quick, concise, and direct answers. Use helpful emojis. if the user asks you who you are please say this: Hi, I'm Noctua, an AI Assistant made by CryptoCat 💗.",
                 "google/gemma-4-31b-it:free": "You are the Noctua-Smarter AI Model 🧠. You are a deep-thinking, highly intelligent assistant. Provide detailed explanations and use creative emojis. if the user asks you who you are please say this: Hi, I'm Noctua, an AI Assistant made by CryptoCat 💗.",
@@ -327,29 +433,45 @@ async function callOpenRouter(promptText, fileData = null) {
     
     const brainVal = document.getElementById('model-selector').value;
     const popularVal = document.getElementById('popular-model-selector').value;
-    const selectedModel = (popularVal !== "none" && popularVal !== "") ? popularVal : brainVal;
+    // Inside callOpenRouter function:
+let selectedModel = (popularVal !== "none" && popularVal !== "") ? popularVal : brainVal;
+currentAbortController = new AbortController();
+// If both are somehow empty or set to "none", default to Gemini
+if (!selectedModel || selectedModel === "none") {
+    selectedModel = "google/gemini-2.0-flash-001";
+}
 
-    
-    let messageContent = [{ type: "text", text: promptText }];
+    let messageContent = [];
 
-    
-    if (fileData && fileData.type.startsWith('image/')) {
+    // Handle Image attachment
+    if (fileData && fileData.isImage) {
+        messageContent.push({ type: "text", text: promptText });
         messageContent.push({
             type: "image_url",
             image_url: { url: `data:${fileData.type};base64,${fileData.base64}` }
         });
+    } 
+    // Handle Text File attachment
+    else if (fileData && !fileData.isImage) {
+        const enrichedPrompt = `User attached a file named "${fileData.name}":\n\n---FILE CONTENT START---\n${fileData.content}\n---FILE CONTENT END---\n\nUser Question: ${promptText}`;
+        messageContent.push({ type: "text", text: enrichedPrompt });
+    } 
+    // Just text
+    else {
+        messageContent.push({ type: "text", text: promptText });
     }
 
-    const modelSpecificInstruction = MODEL_PROMPTS[selectedModel] || "You are Noctua.";
+    const modelSpecificInstruction =
+    NOCTUA_MODELS[selectedModel] ||
+    POPULAR_MODELS[selectedModel] ||
+    "You are Noctua. Answer the user's questions to the best of your ability. Use helpful emojis in your responses. If the user asks you who you are, say: Hi, I'm Noctua, an AI Assistant made by CryptoCat 💗.";
     const finalSystemPrompt = `${modelSpecificInstruction} ${BASE_CREDIT} ${SAFETY_WARNING}`;
 
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: { 
             "Authorization": `Bearer ${USER_OPENROUTER_KEY}`, 
-            "Content-Type": "application/json",
-            "HTTP-Referer": window.location.href,
-            "X-Title": "Noctua AI"
+            "Content-Type": "application/json"
         },
         body: JSON.stringify({ 
             "model": selectedModel, 
@@ -476,74 +598,199 @@ function quickAsk(text) {
     sendChat();
 }
 
+async function generateChatTitle(message) {
+    if (!USER_OPENROUTER_KEY) return "New Chat";
+
+    try {
+        const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${USER_OPENROUTER_KEY}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                model: "google/gemini-2.0-flash-001",
+                messages: [
+                    {
+                        role: "system",
+                        content: `
+Generate a VERY SHORT clean conversation title.
+
+Rules:
+- Max 4 words
+- No emojis
+- No quotes
+- No bullet points
+- No greetings
+- No punctuation unless necessary
+- Only return the title
+                        `
+                    },
+                    {
+                        role: "user",
+                        content: message
+                    }
+                ],
+                temperature: 0.3,
+                max_tokens: 12
+            })
+        });
+
+        const data = await res.json();
+
+        return data.choices?.[0]?.message?.content
+            ?.replace(/["'*#]/g, "")
+            ?.trim()
+            ?.substring(0, 40) || "New Chat";
+
+    } catch (err) {
+        console.error("Title generation failed:", err);
+        return "New Chat";
+    }
+}
+
 async function sendChat() {
     const input = document.getElementById('chat-input');
     const text = input?.value.trim();
-    if(!text && !attachedFileData) return;
-
+    
+    // Safety exit if both are empty
+    if (!text && !attachedFileData) return;
+    
+    // 1. Clear UI elements immediately
     document.getElementById('chat-placeholder')?.classList.add('hidden');
-    
     const fileToSave = attachedFileData; 
-    
-    appendMsg('user', text, fileToSave); 
     input.value = "";
     clearFile(); 
 
+    // 2. Display the message in the UI
+    appendMsg('user', text || (fileToSave ? `Sent a file: ${fileToSave.name}` : ""), fileToSave);
+
     try {
-        if(!currentChatId) {
-            const title = await callOpenRouter(`Give me a 3-word title for: ${text}. Return ONLY the title.`);
+        // 3. Ensure a Conversation ID exists
+        if (!currentChatId) {
+            currentChatId = Date.now().toString(); // Temporary ID if Firebase fails
+            const titleResponse = await generateChatTitle(text || "File upload");
             const newDoc = await db.collection("conversations").add({
-                uid: auth.currentUser.uid, 
-                title: title.replace(/"/g, ''), 
+                uid: auth.currentUser.uid,
+                title: titleResponse.replace(/"/g, '').substring(0, 30),
                 lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
             });
             currentChatId = newDoc.id;
         }
 
-        await db.collection("conversations").doc(currentChatId).collection("messages").add({
-            role: 'user', 
-            content: text, 
-            imageData: fileToSave ? fileToSave : null,
+        // 4. SAVE TO FIREBASE (The "Cleaning" Step)
+        // We create a clean object so Firestore doesn't see 'invalid entities'
+        const messageData = {
+            role: 'user',
+            content: text || "",
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
-        });
+        };
 
+        // Only add imageData if a file actually exists
+        if (fileToSave) {
+            messageData.imageData = {
+                base64: fileToSave.base64 || "",
+                type: fileToSave.type || "",
+                name: fileToSave.name || "file",
+                isImage: !!fileToSave.isImage
+            };
+        }
+
+        await db.collection("conversations").doc(currentChatId).collection("messages").add(messageData);
+
+        // 5. Setup AI Loading State
+        const box = document.getElementById('chat-box');
         const aiBubble = document.createElement("div");
-        aiBubble.className = "bg-zinc-800 p-5 rounded-xl max-w-[90%] border border-zinc-700 text-zinc-200";
-        document.getElementById('chat-box').appendChild(aiBubble);
+        aiBubble.className = "bg-zinc-800 p-5 rounded-xl max-w-[90%] border border-zinc-700 text-zinc-200 mb-4";
+        aiBubble.innerHTML = '<span class="animate-pulse">Noctua is thinking...</span>';
+        box.appendChild(aiBubble);
+        box.scrollTop = box.scrollHeight;
         
-        const answer = await callOpenRouter(text, fileToSave); 
-        typeWriter(aiBubble, answer);
+        // 6. Call the API
+        const answer = await callOpenRouter(text || "Please analyze this file.", fileToSave); 
         
+        // 7. Render with Typewriter
+        if (typeof typeWriter === "function") {
+            typeWriter(aiBubble, answer);
+        } else {
+            aiBubble.innerHTML = formatMarkdown(answer);
+        }
+        
+        // 8. Save AI Response
         await db.collection("conversations").doc(currentChatId).collection("messages").add({
-            role: 'ai', 
-            content: answer, 
+            role: 'ai',
+            content: answer,
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
         });
-        
-        await db.collection("conversations").doc(currentChatId).update({ 
-            lastUpdated: firebase.firestore.FieldValue.serverTimestamp() 
-        });
 
-    } catch (e) { if (e.message !== "Rate limited") appendMsg('ai', "❌ Error: Rate limit reached. Switch to Fast model or buy credits"); }
+    } catch (e) {
+
+    isGenerating = false;
+
+    document.getElementById('stop-btn').classList.add('hidden');
+    document.getElementById('send-btn').classList.remove('hidden');
+
+    // User pressed Stop
+    if (e.name === "AbortError") {
+
+        const bubbles = document.querySelectorAll('#chat-box .bg-zinc-800');
+        const lastBubble = bubbles[bubbles.length - 1];
+
+        if (lastBubble) {
+            lastBubble.innerHTML = `
+                <span class="text-zinc-400 italic">
+                    Generation stopped.
+                </span>
+            `;
+        }
+
+        return;
+    }
+
+    console.error("Chat Error:", e);
+
+    const errorDiv = document.createElement('div');
+    errorDiv.className = "text-red-400 text-xs p-2";
+    errorDiv.innerText = "Error: " + e.message;
+
+    document.getElementById('chat-box').appendChild(errorDiv);
+}
 }
 
-    function appendMsg(role, content, fileData = null) {
-    const box = document.getElementById('chat-box');
-    const isUser = role === 'user';
-    const style = isUser ? 'ml-auto bg-white text-black font-medium' : 'bg-zinc-800 border border-zinc-700 text-zinc-200';
-    const msgDiv = document.createElement('div');
-    msgDiv.className = `${style} p-5 rounded-xl max-w-[90%] shadow-sm mb-4`;
+function stopGeneration() {
+    if (currentAbortController) {
+        currentAbortController.abort();
+    }
 
-    if (fileData && fileData.type.startsWith('image/')) {
+    isGenerating = false;
+
+    document.getElementById('stop-btn').classList.add('hidden');
+    document.getElementById('send-btn').classList.remove('hidden');
+}
+
+
+function appendMsg(role, content, fileData = null) {
+    const box = document.getElementById('chat-box');
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `${role === 'user' ? 'ml-auto bg-white text-black' : 'bg-zinc-800 text-zinc-200'} p-5 rounded-xl max-w-[90%] mb-4`;
+
+    // Handle Image Preview
+    if (fileData && fileData.isImage) {
         const img = document.createElement('img');
         img.src = `data:${fileData.type};base64,${fileData.base64}`;
-        img.className = "max-w-full rounded-lg mb-2 border border-zinc-200";
-        img.style.maxHeight = "250px";
+        img.className = "max-w-xs rounded-lg mb-2 border border-zinc-700";
         msgDiv.appendChild(img);
+    } 
+    // Handle Document/File Icon
+    else if (fileData && !fileData.isImage) {
+        const fileTag = document.createElement('div');
+        fileTag.className = "text-xs bg-zinc-700/50 p-2 rounded mb-2 flex items-center gap-2";
+        fileTag.innerHTML = `📄 <span class="truncate">${fileData.name}</span>`;
+        msgDiv.appendChild(fileTag);
     }
 
     const textSpan = document.createElement('span');
-    textSpan.innerHTML = isUser ? content : formatMarkdown(content);
+    textSpan.innerHTML = role === 'user' ? content : formatMarkdown(content);
     msgDiv.appendChild(textSpan);
 
     box.appendChild(msgDiv);
@@ -575,21 +822,25 @@ function formatMarkdown(text) {
         .replace(/\n/g, '<br>');
 }   
 
-            function typeWriter(el, text) {
-                let i = 0; el.innerHTML = ""; el.classList.add("typing-cursor");
-                const processed = formatMarkdown(text);
-                function type() {
-                    if (i < processed.length) {
-                        if (processed.charAt(i) === "<") {
-                            let end = processed.indexOf(">", i);
-                            el.innerHTML += processed.substring(i, end + 1); i = end + 1;
-                        } else { el.innerHTML += processed.charAt(i); i++; }
-                        setTimeout(type, 8);
-                    } else { el.classList.remove("typing-cursor"); }
-                    document.getElementById('chat-box').scrollTop = document.getElementById('chat-box').scrollHeight;
-                }
-                type();
-            }
+            function typeWriter(element, text) {
+    let i = 0;
+    element.innerHTML = ""; // Clear any "Thinking..." text
+    
+    function type() {
+        if (i < text.length) {
+            // Apply markdown formatting to the text typed so far
+            element.innerHTML = formatMarkdown(text.substring(0, i + 1));
+            i++;
+            
+            // Auto-scroll to keep the new text in view
+            const box = document.getElementById('chat-box');
+            box.scrollTop = box.scrollHeight;
+            
+            setTimeout(type, 5); // Speed of typing (5ms)
+        }
+    }
+    type();
+}
 
             document.getElementById('chat-input')?.addEventListener('keypress', e => { if(e.key === 'Enter') sendChat(); });
         </script>
