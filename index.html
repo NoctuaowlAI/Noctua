@@ -1,4 +1,4 @@
-       <!DOCTYPE html>
+    <!DOCTYPE html>
     <html lang="en">
     <head>
         <div style="position:fixed; top:0; right:0; color:red; font-weight:bold; padding:10px; z-index:9999; font-family:sans-serif;">ALPHA TEST BUILD. EXPECT BUGS</div>
@@ -98,7 +98,7 @@
         <aside id="sidebar" class="hidden w-72 border-r border-zinc-800 p-6 flex flex-col gap-6">
             <div class="flex flex-col items-center mb-6"><svg xmlns="http://www.w3.org/2000/svg" width="100" height="90" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="bg-zinc-800/50 p-4 rounded-2xl border border-zinc-700 shadow-xl mb-2"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M12 17a5 5 0 0 1-5-5 5 5 0 0 1 5-5 5 5 0 0 1 5 5 5 5 0 0 1-5 5z"/><circle cx="9" cy="11" r="1" fill="white"/><circle cx="15" cy="11" r="1" fill="white"/><path d="M12 13l-1 2h2z"/></svg><h1 class="text-3xl font-bold text-white tracking-tight">Noctua</h1></div>
             <nav class="flex flex-col gap-1">
-                <div id="nav-dashboard" onclick="showView('dashboard', this)" class="nav-link sidebar-item active-nav p-3 rounded-lg flex items-center gap-3">Dashboard</div>
+                
                 <div id="nav-chat" onclick="showView('chat', this)" class="nav-link sidebar-item p-3 rounded-lg flex items-center gap-3 text-zinc-400">AI Chat</div>
                 <div onclick="startNewChat()" class="sidebar-item p-3 mt-4 border border-zinc-800 rounded-lg text-center text-xs hover:bg-zinc-900 text-zinc-400 font-medium transition">+ New Conversation</div>
                 <div onclick="toggleKeyModal(true)" class="sidebar-item p-3 mt-2 border border-dashed border-zinc-800 rounded-lg text-center text-[10px] hover:bg-zinc-900 text-zinc-500 font-medium transition">⚙️ Update API Key</div>
@@ -116,20 +116,6 @@
         </aside>
 
         <main id="main-content" class="hidden flex-1 p-10 overflow-y-auto">
-            <section id="view-dashboard">
-                <h1 class="text-3xl font-bold mb-4">Welcome back</h1>
-                <p class="text-zinc-500 mb-8">Access your conversations or start a new session from the sidebar.</p>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div class="glass-card p-6">
-                        <h3 class="font-bold mb-2">Total Conversations</h3>
-                        <p id="stat-total-chats" class="text-3xl font-bold">0</p>
-                    </div>
-                    <div class="glass-card p-6">
-                        <h3 class="font-bold mb-2">Account Status</h3>
-                        <p class="text-emerald-500 font-bold">Connected</p>
-                    </div>
-                </div>
-            </section>
 
             <section id="view-chat" class="hidden h-full flex flex-col">
                 <div class="glass-card flex-1 flex flex-col overflow-hidden">
@@ -373,6 +359,7 @@ function clearFile() {
             let currentChatId = null;
             let USER_OPENROUTER_KEY = ""; 
             let currentAbortController = null;
+        
 let isGenerating = false;
 
             const NOCTUA_MODELS = {
@@ -389,7 +376,7 @@ let isGenerating = false;
         "You are Noctua Code. Help with coding and problem solving. use helpful emojis"
 };
             const POPULAR_MODELS = {
-                "openai/gpt-oss-120b:free": "You are ChatGPT used from Noctua 🤖. You are capable of writing text,  ode, brainstorming, and analyzing images or data. And answering questions",
+                "openai/gpt-oss-120b:free": "You are ChatGPT used from Noctua 🤖. You are capable of writing text, debugging code, brainstorming, and analyzing images or data. And answering questions",
                 "google/gemma-4-26b-a4b-it:free": "You are Gemini used from Noctua ✨. You are intellectually curious, highly sociable, witty, and adaptable, often acting as a communicative social butterfly",
                 "poolside/laguna-m.1:free": "You are Claude used from Noctua ☁️. You are highly helpful, honest, and harmless AI assistant, often described as having a warm, collaborative, and, at times, exuberant personality."
             };
@@ -402,14 +389,19 @@ let isGenerating = false;
                 document.getElementById('auth-overlay').classList.toggle('hidden', loggedIn);
                 document.getElementById('sidebar').classList.toggle('hidden', !loggedIn);
                 document.getElementById('main-content').classList.toggle('hidden', !loggedIn);
-                if (user) {
-                    document.getElementById('user-email').innerText = user.email;
-                    await initializeUserData(user);
-                    loadHistory();
-                    if (!USER_OPENROUTER_KEY) toggleKeyModal(true);
-                }
-            });
+               if (user) {
+    const emailEl = document.getElementById('user-email');
+    if (emailEl) emailEl.innerText = user.email;
 
+    await initializeUserData(user);
+    loadHistory();
+    showView('chat', document.getElementById('nav-chat'));
+
+    if (!USER_OPENROUTER_KEY) toggleKeyModal(true);
+}
+                
+            
+}); 
             async function initializeUserData(user) {
                 const userRef = db.collection("users").doc(user.uid);
                 const doc = await userRef.get();
@@ -588,7 +580,7 @@ async function loadExistingChat(id) {
     box.scrollTop = box.scrollHeight;
 
             }
-
+        
 function startNewChat() {
     currentChatId = null;
     const [p1, p2] = getRandomPrompts();
@@ -876,6 +868,9 @@ function formatMarkdown(text) {
 }
 
             document.getElementById('chat-input')?.addEventListener('keypress', e => { if(e.key === 'Enter') sendChat(); });
+            
         </script>
+    </div>
     </body>
     </html>
+
