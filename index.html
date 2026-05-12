@@ -1,4 +1,4 @@
-       <!DOCTYPE html>
+    <!DOCTYPE html>
     <html lang="en">
     <head>
         <div style="position:fixed; top:0; right:0; color:red; font-weight:bold; padding:10px; z-index:9999; font-family:sans-serif;">ALPHA TEST BUILD. EXPECT BUGS</div>
@@ -142,18 +142,18 @@
                     </div>
                     <div class="p-6 border-t border-zinc-800 bg-[#111113]">
                         <div class="flex items-center gap-2 mb-3 px-1">
-                            <span class="text-[10px] text-zinc-500 uppercase font-bold tracking-tighter">Model Brain:</span>
+                            <span class="text-[10px] text-zinc-500 uppercase font-bold tracking-tighter">Noctua Models:</span>
                             <select id="model-selector" class="model-select" onchange="handleModelChange('brain')">
-                                <option value="google/gemini-2.0-flash-001" selected>🚀 Fast</option>
-                                <option value="google/gemma-4-31b-it:free">🧠 Smarter</option>
-                                <option value="nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free">📚 research, study, and homework</option>
-                                <option value="openai/gpt-oss-120b:free">💻 Coding and Problem Solving with GPT4</option>
-                                <option value="none">-- None (Use Popular AI Models) --</option>
+                                <option value="google/gemini-2.0-flash-001" selected>🚀 Fast (usually takes 1-2 seconds)</option>
+                                <option value="arcee-ai/trinity-large-thinking:free">🧠 Smarter (takes 3 seconds)</option>
+                                <option value="nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free">📚 research, study, and homework (takes 4 seconds depending on how heavy the task is)</option>
+                                <option value="openai/gpt-oss-120b:free">💻 Coding and Problem Solving with GPT4 (takes 1min to generate but depends on how big the project is)</option>
+                                <option value="none">-- None (Use AI Models) --</option>
                             </select>
-                    <span class="text-[10px] text-zinc-500 uppercase font-bold tracking-tighter ml-4">Popular AI:</span>
+                    <span class="text-[10px] text-zinc-500 uppercase font-bold tracking-tighter ml-4">AI Models:</span>
                     <select id="popular-model-selector" class="model-select" onchange="handleModelChange('popular')">
                     <option value="none" selected>-- None (Use Noctua) --</option>
-                    <option value="" selected disabled>Select Popular AI Models</option>
+                    <option value="" selected disabled>Select AI Models</option>
                     <option value="openai/gpt-oss-120b:free">ChatGPT</option>
                     <option value="poolside/laguna-m.1:free">Claude</option>
                     <option value="google/gemma-4-26b-a4b-it:free">Gemini</option> 
@@ -481,8 +481,8 @@ let isGenerating = false;
     "google/gemini-2.0-flash-001":
         "You are Noctua Fast. Give short, direct, useful answers. use helpful emojis",
 
-    "google/gemma-4-31b-it:free":
-        "You are Noctua Smart. Give detailed and thoughtful answers. use helpful emojis",
+    "arcee-ai/trinity-large-thinking:free":
+        "You are the Noctua 'Smart' AI Model. Give detailed and thoughtful answers. use helpful emojis",
 
     "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free":
         "You are Noctua Research. Help with research, studying, and explanations. use helpful emojis",
@@ -491,9 +491,9 @@ let isGenerating = false;
         "You are Noctua Code. Help with coding and problem solving. use helpful emojis"
 };
             const POPULAR_MODELS = {
-                "openai/gpt-oss-120b:free": "You are ChatGPT used from Noctua 🤖. You are capable of writing text, debugging code, brainstorming, and analyzing images or data. And answering questions",
-                "google/gemma-4-26b-a4b-it:free": "You are Gemini used from Noctua ✨. You are intellectually curious, highly sociable, witty, and adaptable, often acting as a communicative social butterfly",
-                "poolside/laguna-m.1:free": "You are Claude used from Noctua ☁️. You are highly helpful, honest, and harmless AI assistant, often described as having a warm, collaborative, and, at times, exuberant personality."
+                "openai/gpt-oss-120b:free": "You are ChatGPT. You are capable of writing text, debugging code, brainstorming, and analyzing images or data. And answering questions",
+                "google/gemma-4-26b-a4b-it:free": "You are Gemini. You are intellectually curious, highly sociable, witty, and adaptable, often acting as a communicative social butterfly",
+                "poolside/laguna-m.1:free": "You are Claude. You are highly helpful, honest, and harmless AI assistant, often described as having a warm, collaborative, and, at times, exuberant personality."
             };
 
             
@@ -988,4 +988,5 @@ function formatMarkdown(text) {
     </div>
     </body>
     </html>
+
 
