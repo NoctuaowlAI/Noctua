@@ -1,4 +1,4 @@
-    <!DOCTYPE html>
+       <!DOCTYPE html>
     <html lang="en">
     <head>
         <div style="position:fixed; top:0; right:0; color:red; font-weight:bold; padding:10px; z-index:9999; font-family:sans-serif;">ALPHA TEST BUILD. EXPECT BUGS</div>
@@ -230,6 +230,46 @@
         reader.onload = function(e) {
             const isImage = file.type.startsWith('image/');
             
+function compressImage(file, callback) {
+    const reader = new FileReader();
+
+    reader.onload = function(e) {
+        const img = new Image();
+
+        img.onload = function() {
+            const canvas = document.createElement("canvas");
+            const maxWidth = 1024;
+
+            const scale = maxWidth / img.width;
+            canvas.width = maxWidth;
+            canvas.height = img.height * scale;
+
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+            const compressedBase64 = canvas.toDataURL("image/jpeg", 0.7);
+
+            callback({
+                base64: compressedBase64.split(",")[1],
+                type: "image/jpeg",
+                name: file.name,
+                isImage: true
+            });
+        };
+
+        img.src = e.target.result;
+    };
+
+    compressImage(file, (processed) => {
+    attachedFileData = processed;
+
+    const preview = document.getElementById('file-preview');
+    preview.classList.remove('hidden');
+    preview.innerHTML = `<span class="text-xs text-zinc-300">📎 ${file.name}</span>
+    <button onclick="clearFile()" class="text-red-500 ml-2 hover:text-red-400">✕</button>`;
+});
+}
+
             attachedFileData = {
                 base64: isImage ? e.target.result.split(',')[1] : null,
                 content: isImage ? null : e.target.result,
@@ -262,11 +302,86 @@
         document.getElementById('file-preview').classList.add('hidden');
     }
 const RANDOM_PROMPTS = [
-    "Explain quantum physics simply", "Write a Python timer script",
-    "How do I bake a chocolate cake?", "Give me 5 workout ideas",
-    "Summarize the plot of Inception", "Write a poem about an owl",
-    "How does a fuel cell work?", "Tips for better sleep",
-    "Tell me a dad joke", "Explain photosynthesis"
+  "How do black holes form?",
+  "Write a basic HTML/CSS template",
+  "What is the best way to learn a new language?",
+  "List 5 healthy meal prep ideas",
+  "Explain the ending of Interstellar",
+  "Write a haiku about a rainy day",
+  "How does a microwave cook food?",
+  "Effective strategies for time management",
+  "What do you call a fish with no eyes?",
+  "Describe the water cycle",
+  "Explain the basics of stock market investing",
+  "Write a SQL query to join two tables",
+  "How to fix a leaky faucet",
+  "Suggest 5 beginner-friendly yoga poses",
+  "Summarize the French Revolution",
+  "Write a short story about a time traveler",
+  "How do noise-canceling headphones work?",
+  "Ways to reduce your carbon footprint",
+  "Why don't scientists trust atoms?",
+  "Explain how neural networks learn",
+  "How does cryptocurrency work?",
+  "Write a JavaScript fetch request example",
+  "What are the symptoms of burnout?",
+  "List 5 indoor plants that need low light",
+  "Explain the Mandela Effect",
+  "Write a song lyric about the ocean",
+  "How do solar panels generate electricity?",
+  "Tips for speaking confidently in public",
+  "Why did the scarecrow win an award?",
+  "Explain the theory of relativity",
+  "What is the difference between active and passive voice?",
+  "Write a bash script to back up a folder",
+  "How do you properly remove a stripped screw?",
+  "Suggest 5 bodyweight exercises for beginners",
+  "Summarize the history of the Silk Road",
+  "Write a dialogue between two rivals meeting by accident",
+  "How does fiber optic internet transmit data?",
+  "Methods to practice daily mindfulness",
+  "What do you call a fake noodle?",
+  "Explain the role of mitochondria in a cell",
+  "How does machine learning differ from AI?",
+  "Write a regex pattern to validate email addresses",
+  "What are the best habits for mental clarity?",
+  "List 5 essential items for a hiking trip",
+  "Explain the significance of the Rosetta Stone",
+  "Write a poem using only metaphors",
+  "How does an airplane fly?",
+  "Tips for negotiating a salary increase",
+  "How do you organize a space station? You planet.",
+  "Explain how the human immune system fights viruses",
+  "What is the difference between SQL and NoSQL?",
+  "Write a Python script to scrape a webpage",
+  "How do you safely jump-start a car battery?",
+  "Suggest 5 stretching exercises for desk workers",
+  "Summarize the plot of Romeo and Juliet",
+  "Write a opening scene for a mystery novel",
+  "How do touchscreens detect finger inputs?",
+  "Strategies for saving money on a tight budget",
+  "Why did the stadium get hot? All the fans left.",
+  "Explain the process of fermentation",
+  "How does blockchain secure data?",
+  "Write a CSS grid layout example",
+  "What are the warning signs of chronic stress?",
+  "List 5 low-maintenance backyard landscaping ideas",
+  "Explain the significance of the Magna Carta",
+  "Write a descriptive paragraph about a bustling night market",
+  "How does a refrigerator keep food cold?",
+  "Tips for improving your remote work productivity",
+  "What do you call an alligator in a vest? ",
+  "Explain how the greenhouse effect warms the planet",
+  "What is the difference between REST and GraphQL?",
+  "Write a Python function to check for palindromes",
+  "How do you fix a running toilet?",
+  "Suggest 5 core exercises for runners",
+  "Summarize the plot of Hamlet",
+  "Write a monologue for a villain who thinks they are the hero",
+  "How do Bluetooth devices pair with each other?",
+  "Strategies for active listening in relationships",
+  "Why did the computer go to the doctor? It had a virus.",
+  "Explain the function of enzymes in human digestion"
 ];
 
 function getRandomPrompts() {
