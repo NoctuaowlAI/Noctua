@@ -1,4 +1,4 @@
-       <!DOCTYPE html>
+    <!DOCTYPE html>
     <html lang="en">
     <head>
         <div style="position:fixed; top:0; right:0; color:red; font-weight:bold; padding:10px; z-index:9999; font-family:sans-serif;">ALPHA TEST BUILD. EXPECT BUGS</div>
@@ -116,7 +116,14 @@
         </aside>
 
         <main id="main-content" class="hidden flex-1 p-10 overflow-y-auto">
-
+            <div class="lg:hidden flex items-center justify-between p-4 border-b border-zinc-800 bg-[#09090b]">
+    <button onclick="toggleSidebar(true)" class="p-2 text-zinc-400">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+    </button>
+    <span class="font-bold tracking-tight">Noctua</span>
+    <div class="w-10"></div> </div>
             <section id="view-chat" class="hidden h-full flex flex-col">
                 <div class="glass-card flex-1 flex flex-col overflow-hidden">
                     <div id="chat-box" class="flex-1 p-8 overflow-y-auto space-y-6 scroll-smooth">
@@ -142,21 +149,22 @@
                     </div>
                     <div class="p-6 border-t border-zinc-800 bg-[#111113]">
                         <div class="flex items-center gap-2 mb-3 px-1">
-                            <span class="text-[10px] text-zinc-500 uppercase font-bold tracking-tighter">Model Brain:</span>
+                            <span class="text-[10px] text-zinc-500 uppercase font-bold tracking-tighter">Noctua Models:</span>
                             <select id="model-selector" class="model-select" onchange="handleModelChange('brain')">
-                                <option value="google/gemini-2.0-flash-001" selected>🚀 Fast</option>
-                                <option value="google/gemma-4-31b-it:free">🧠 Smarter</option>
-                                <option value="nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free">📚 research, study, and homework</option>
+                                <option value="google/gemini-2.0-flash-001" selected>🚀 Noctua Fast</option>
+                                <option value="arcee-ai/trinity-large-thinking:free">🧠 Noctua Smarter</option>
+                                <option value="openai/gpt-oss-120b:free">📚 research, study, and homework</option>
                                 <option value="openai/gpt-oss-120b:free">💻 Coding and Problem Solving with GPT4</option>
                                 <option value="none">-- None (Use Popular AI Models) --</option>
                             </select>
                     <span class="text-[10px] text-zinc-500 uppercase font-bold tracking-tighter ml-4">Popular AI:</span>
                     <select id="popular-model-selector" class="model-select" onchange="handleModelChange('popular')">
                     <option value="none" selected>-- None (Use Noctua) --</option>
-                    <option value="" selected disabled>Select Popular AI Models</option>
-                    <option value="openai/gpt-oss-120b:free">ChatGPT</option>
-                    <option value="poolside/laguna-m.1:free">Claude</option>
-                    <option value="google/gemma-4-26b-a4b-it:free">Gemini</option> 
+                    <option value="openai/gpt-oss-120b:free">🤖 ChatGPT</option>
+                    <option value="google/gemma-4-26b-a4b-it:free">✨ Gemini</option> 
+                    <option value="poolside/laguna-m.1:free">☁️ Claude</option>
+                    <option value="openrouter/free">❓ Random (randomly picks every AI! may select some AIs arent even accessable to Noctua)</option>
+                    <option value="" selected disabled>Select AI Models</option>
                     </select>
                     </div>
                         </div>
@@ -269,6 +277,7 @@ function compressImage(file, callback) {
     <button onclick="clearFile()" class="text-red-500 ml-2 hover:text-red-400">✕</button>`;
 });
 }
+
 
             attachedFileData = {
                 base64: isImage ? e.target.result.split(',')[1] : null,
@@ -481,19 +490,20 @@ let isGenerating = false;
     "google/gemini-2.0-flash-001":
         "You are Noctua Fast. Give short, direct, useful answers. use helpful emojis",
 
-    "google/gemma-4-31b-it:free":
+    "arcee-ai/trinity-large-thinking:free":
         "You are Noctua Smart. Give detailed and thoughtful answers. use helpful emojis",
 
-    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free":
+    "openai/gpt-oss-120b:free":
         "You are Noctua Research. Help with research, studying, and explanations. use helpful emojis",
 
     "openai/gpt-oss-120b:free":
         "You are Noctua Code. Help with coding and problem solving. use helpful emojis"
 };
-            const POPULAR_MODELS = {
-                "openai/gpt-oss-120b:free": "You are ChatGPT used from Noctua 🤖. You are capable of writing text, debugging code, brainstorming, and analyzing images or data. And answering questions",
-                "google/gemma-4-26b-a4b-it:free": "You are Gemini used from Noctua ✨. You are intellectually curious, highly sociable, witty, and adaptable, often acting as a communicative social butterfly",
-                "poolside/laguna-m.1:free": "You are Claude used from Noctua ☁️. You are highly helpful, honest, and harmless AI assistant, often described as having a warm, collaborative, and, at times, exuberant personality."
+            const POPULAR_MODELS =  {
+                "openai/gpt-oss-120b:free": "You are ChatGPT 🤖. You are capable of writing text, debugging code, brainstorming, and analyzing images or data. And answering questions",
+                "google/gemma-4-26b-a4b-it:free": "You are Gemini ✨. You are intellectually curious, highly sociable, witty, and adaptable, often acting as a communicative social butterfly",
+                "poolside/laguna-m.1:free": "You are Claude ☁️. You are highly helpful, honest, and harmless AI assistant, often described as having a warm, collaborative, and, at times, exuberant personality.",
+                "openrouter/free": "You are a random AI ❓. You must NOT speak of your truth identity, but you can give the use hints. please use helpful emojis"
             };
 
             
@@ -988,3 +998,4 @@ function formatMarkdown(text) {
     </div>
     </body>
     </html>
+
