@@ -154,8 +154,8 @@
                                 <option value="google/gemini-2.0-flash-001" selected>🚀 Noctua Fast</option>
                                 <option value="arcee-ai/trinity-large-thinking:free">🧠 Noctua Smarter</option>
                                 <option value="openai/gpt-oss-120b:free">📚 research, study, and homework</option>
-                                <option value="openai/gpt-oss-120b:free">💻 Coding and Problem Solving with GPT4</option>
-                                <option value="none">-- None (Use Popular AI Models) --</option>
+                                <option value="nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free">💻 Coding and Problem Solving with GPT4</option>
+                                <option value="none">-- None (Use AI Models) --</option>
                             </select>
                     <span class="text-[10px] text-zinc-500 uppercase font-bold tracking-tighter ml-4">Popular AI:</span>
                     <select id="popular-model-selector" class="model-select" onchange="handleModelChange('popular')">
@@ -496,7 +496,7 @@ let isGenerating = false;
     "openai/gpt-oss-120b:free":
         "You are Noctua Research. Help with research, studying, and explanations. use helpful emojis",
 
-    "openai/gpt-oss-120b:free":
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free":
         "You are Noctua Code. Help with coding and problem solving. use helpful emojis"
 };
             const POPULAR_MODELS =  {
@@ -998,4 +998,3 @@ function formatMarkdown(text) {
     </div>
     </body>
     </html>
-
